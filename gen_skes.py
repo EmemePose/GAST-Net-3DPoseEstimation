@@ -9,6 +9,9 @@ import h5py
 from tqdm import tqdm
 
 sys.path.insert(0, osp.dirname(osp.realpath(__file__)))
+
+sys.path.insert(0, os.path.dirname(__file__))
+
 from tools.utils import get_path
 from model.gast_net import SpatioTemporalModel, SpatioTemporalModelOptimized1f
 # from imp_model.gast_net import SpatioTemporalModelOptimized1f
@@ -29,8 +32,8 @@ sys.path.pop(0)
 
 
 skeleton = Skeleton(parents=[-1, 0, 1, 2, 0, 4, 5, 0, 7, 8, 9, 8, 11, 12, 8, 14, 15],
-                    joints_left=[6, 7, 8, 9, 10, 16, 17, 18, 19, 20, 21, 22, 23],
-                    joints_right=[1, 2, 3, 4, 5, 24, 25, 26, 27, 28, 29, 30, 31])
+					joints_left=[6, 7, 8, 9, 10, 16, 17, 18, 19, 20, 21, 22, 23],
+					joints_right=[1, 2, 3, 4, 5, 24, 25, 26, 27, 28, 29, 30, 31])
 adj = adj_mx_from_skeleton(skeleton)
 
 joints_left, joints_right = [4, 5, 6, 11, 12, 13], [1, 2, 3, 14, 15, 16]
@@ -41,140 +44,167 @@ width, height = (1920, 1080)
 
 
 def load_model_realtime(rf=81):
-    if rf == 27:
-        chk = model_dir + '27_frame_model_causal.bin'
-        filters_width = [3, 3, 3]
-        channels = 128
-    elif rf == 81:
-        chk = model_dir + '81_frame_model_causal.bin'
-        filters_width = [3, 3, 3, 3]
-        channels = 64
-    else:
-        raise ValueError('Only support 27 and 81 receptive field models for inference!')
+	if rf == 27:
+		chk = model_dir + '27_frame_model_causal.bin'
+		filters_width = [3, 3, 3]
+		channels = 128
+	elif rf == 81:
+		chk = model_dir + '81_frame_model_causal.bin'
+		filters_width = [3, 3, 3, 3]
+		channels = 64
+	else:
+		raise ValueError('Only support 27 and 81 receptive field models for inference!')
 
-    print('Loading GAST-Net ...')
-    model_pos = SpatioTemporalModelOptimized1f(adj, 17, 2, 17, filter_widths=filters_width, causal=True,
-                                               channels=channels, dropout=0.25)
+	print('Loading GAST-Net ...')
+	model_pos = SpatioTemporalModelOptimized1f(adj, 17, 2, 17, filter_widths=filters_width, causal=True,
+											   channels=channels, dropout=0.25)
 
-    # Loading pre-trained model
-    checkpoint = torch.load(chk)
-    model_pos.load_state_dict(checkpoint['model_pos'])
+	# Loading pre-trained model
+	checkpoint = torch.load(chk)
+	model_pos.load_state_dict(checkpoint['model_pos'])
 
-    if torch.cuda.is_available():
-        model_pos = model_pos.cuda()
-    model_pos.eval()
+	if torch.cuda.is_available():
+		model_pos = model_pos.cuda()
+	model_pos.eval()
 
-    print('GAST-Net successfully loaded')
+	print('GAST-Net successfully loaded')
 
-    return model_pos
+	return model_pos
 
 
 def load_model_layer(rf=27):
-    if rf == 27:
-        chk = model_dir + '27_frame_model.bin'
-        filters_width = [3, 3, 3]
-        channels = 128
-    elif rf == 81:
-        chk = model_dir + '81_frame_model.bin'
-        filters_width = [3, 3, 3, 3]
-        channels = 64
-    else:
-        raise ValueError('Only support 27 and 81 receptive field models for inference!')
+	if rf == 27:
+		chk = model_dir + '27_frame_model.bin'
+		filters_width = [3, 3, 3]
+		channels = 128
+	elif rf == 81:
+		chk = model_dir + '81_frame_model.bin'
+		filters_width = [3, 3, 3, 3]
+		channels = 64
+	else:
+		raise ValueError('Only support 27 and 81 receptive field models for inference!')
 
-    print('Loading GAST-Net ...')
-    model_pos = SpatioTemporalModel(adj, 17, 2, 17, filter_widths=filters_width, channels=channels, dropout=0.05)
+	print('Loading GAST-Net ...')
+	model_pos = SpatioTemporalModel(adj, 17, 2, 17, filter_widths=filters_width, channels=channels, dropout=0.05)
 
-    # Loading pre-trained model
-    checkpoint = torch.load(chk)
-    model_pos.load_state_dict(checkpoint['model_pos'])
+	# Loading pre-trained model
+	checkpoint = torch.load(chk)
+	model_pos.load_state_dict(checkpoint['model_pos'])
 
-    if torch.cuda.is_available():
-        model_pos = model_pos.cuda()
-    model_pos = model_pos.eval()
+	if torch.cuda.is_available():
+		model_pos = model_pos.cuda()
+	model_pos = model_pos.eval()
 
-    print('GAST-Net successfully loaded')
+	print('GAST-Net successfully loaded')
 
-    return model_pos
+	return model_pos
 
 
 def generate_skeletons(video='', rf=27, output_animation=False, num_person=1, ab_dis=False):
-    """
-    :param video: The input video name. The video is placed in the Data folder
-    :param output_npz: The output file. If the output_npz is set to true, the output_animation must be false
-    :param rf: receptive fields
-    :param output_animation: Generating animation video
-    :param num_person: The number of 3D poses generated in the video. 1 or 2
-    :param ab_dis: Whether the 3D pose generates the absolute distance of the plane (x, y)
-    """
+	"""
+	:param video: The input video name. The video is placed in the Data folder
+	:param output_npz: The output file. If the output_npz is set to true, the output_animation must be false
+	:param rf: receptive fields
+	:param output_animation: Generating animation video
+	:param num_person: The number of 3D poses generated in the video. 1 or 2
+	:param ab_dis: Whether the 3D pose generates the absolute distance of the plane (x, y)
+	"""
 
-    # video = data_root + video
-    cap = cv2.VideoCapture(video)
-    width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
-    height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+	# video = data_root + video
+	cap = cv2.VideoCapture(video)
+	width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+	height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
 
-    keypoints, scores = hrnet_pose(video, det_dim=416, num_peroson=num_person, gen_output=True)
-    keypoints, scores, valid_frames = h36m_coco_format(keypoints, scores)
-    re_kpts = revise_kpts(keypoints, scores, valid_frames)
-    num_person = len(re_kpts)
+	# keypoints, scores = hrnet_pose(video, det_dim=416, num_peroson=num_person, gen_output=True)
 
-    # Loading 3D pose model
-    model_pos = load_model_layer(rf)
+	# print('keypoints shape: ', keypoints[0])
+	
+	# keypoints, scores, valid_frames = h36m_coco_format(keypoints, scores)
 
-    print('Generating 3D human pose ...')
-    # pre-process keypoints
+	# print('keypoints shape: ', keypoints[0])
+	# print('valid frames: ', valid_frames)
 
-    pad = (rf - 1) // 2  # Padding on each side
-    causal_shift = 0
+	# re_kpts = revise_kpts(keypoints, scores, valid_frames)
 
-    # Generating 3D poses
-    prediction = gen_pose(re_kpts, valid_frames, width, height, model_pos, pad, causal_shift)
+	# print('re_kpts shape: ', re_kpts.shape)
+	# exit(0)
+	
+	keypoints = np.load('/home/jqin/wk/pose/pipeline/TransPose/bye_2139.npy').squeeze(1)
+	print(keypoints.shape)
+	keypoints = coco_h36m( keypoints)
+	keypoints = np.expand_dims(keypoints, 1)
+	re_kpts = np.transpose(keypoints, [1,0,2,3])
+	valid_frames = [ np.arange(95) ]
+	
+	print(re_kpts.shape)
+	num_person = len(re_kpts)
 
-    # Adding absolute distance to 3D poses and rebase the height
-    if num_person == 2:
-        prediction = revise_skes(prediction, re_kpts, valid_frames)
-    elif ab_dis:
-        prediction[0][:, :, 2] -= np.expand_dims(np.amin(prediction[0][:, :, 2], axis=1), axis=1).repeat([17], axis=1)
-    else:
-        prediction[0][:, :, 2] -= np.amin(prediction[0][:, :, 2])
+	# Loading 3D pose model
+	model_pos = load_model_layer(rf)
 
-    # If output two 3D human poses, put them in the same 3D coordinate system
-    same_coord = False
-    if num_person == 2:
-        same_coord = True
+	print('Generating 3D human pose ...')
+	# pre-process keypoints
 
-    anim_output = {}
-    for i, anim_prediction in enumerate(prediction):
-        anim_output.update({'Reconstruction %d' % (i+1): anim_prediction})
+	pad = (rf - 1) // 2  # Padding on each side
+	causal_shift = 0
 
-    if output_animation:
-        viz_output = './output/' + 'animation_' + video.split('/')[-1].split('.')[0] + '.mp4'
-        print('Generating animation ...')
-        # re_kpts: (M, T, N, 2) --> (T, M, N, 2)
-        re_kpts = re_kpts.transpose(1, 0, 2, 3)
-        render_animation(re_kpts, keypoints_metadata, anim_output, skeleton, 25, 30000, np.array(70., dtype=np.float32),
-                         viz_output, input_video_path=video, viewport=(width, height), com_reconstrcution=same_coord)
-    else:
-        print('Saving 3D reconstruction...')
-        output_npz = './output/' + video.split('/')[-1].split('.')[0] + '.npz'
-        np.savez_compressed(output_npz, reconstruction=prediction)
-        print('Completing saving...')
+	# Generating 3D poses
+	
+	prediction = gen_pose(re_kpts, valid_frames, width, height, model_pos, pad, causal_shift)
+	np.save('GAST_3D_omg.npy', prediction)
+	
+	# prediction = np.load('/home/jqin/wk/pose/TransPose/MHFormer/outputs/test_3d_output.npy')
+	# prediction = np.expand_dims(prediction, 0)
+
+	# Adding absolute distance to 3D poses and rebase the height
+	if num_person == 2:
+		prediction = revise_skes(prediction, re_kpts, valid_frames)
+	elif ab_dis:
+		prediction[0][:, :, 2] -= np.expand_dims(np.amin(prediction[0][:, :, 2], axis=1), axis=1).repeat([17], axis=1)
+	else:
+		prediction[0][:, :, 2] -= np.amin(prediction[0][:, :, 2])
+
+	# If output two 3D human poses, put them in the same 3D coordinate system
+	same_coord = False
+	if num_person == 2:
+		same_coord = True
+
+	anim_output = {}
+	for i, anim_prediction in enumerate(prediction):
+		anim_output.update({'Reconstruction %d' % (i+1): anim_prediction})
+
+	if output_animation:
+		viz_output = './output/' + 'animation_' + video.split('/')[-1].split('.')[0] + '.mp4'
+		print('Generating animation ...')
+		# re_kpts: (M, T, N, 2) --> (T, M, N, 2)
+		re_kpts = re_kpts.transpose(1, 0, 2, 3)
+		render_animation(re_kpts, keypoints_metadata, anim_output, skeleton, 25, 30000, np.array(70., dtype=np.float32),
+						 viz_output, input_video_path=video, viewport=(width, height), com_reconstrcution=same_coord)
+	else:
+		print('Saving 3D reconstruction...')
+		output_npz = './output/' + video.split('/')[-1].split('.')[0] + '.npz'
+		np.savez_compressed(output_npz, reconstruction=prediction)
+		print('Completing saving...')
 
 
 def arg_parse():
-    """
-    Parse arguments for the skeleton module
-    """
-    parser = argparse.ArgumentParser('Generating skeleton demo.')
-    parser.add_argument('-rf', '--receptive-field', type=int, default=81, help='number of receptive fields')
-    parser.add_argument('-v', '--video', type=str, default='baseball.mp4', help='input video')
-    parser.add_argument('-a', '--animation', action='store_true', help='output animation')
-    parser.add_argument('-np', '--num-person', type=int, default=1, help='number of estimated human poses. [1, 2]')
-    args = parser.parse_args()
+	"""
+	Parse arguments for the skeleton module
+	"""
+	parser = argparse.ArgumentParser('Generating skeleton demo.')
+	parser.add_argument('-rf', '--receptive-field', type=int, default=81, help='number of receptive fields')
+	parser.add_argument('-v', '--video', type=str, default='baseball.mp4', help='input video')
+	parser.add_argument('-a', '--animation', action='store_true', help='output animation')
+	parser.add_argument('-np', '--num-person', type=int, default=1, help='number of estimated human poses. [1, 2]')
+	args = parser.parse_args()
 
-    return args
+	return args
 
 
 if __name__ == "__main__":
-    args = arg_parse()
-    video_path = data_root + 'video/' + args.video
-    generate_skeletons(video=video_path, output_animation=args.animation, num_person=args.num_person)
+	args = arg_parse()
+	video_path = data_root + 'video/' + args.video
+	video_path = args.video
+	video_path = '/home/jqin/wk/pose/video-to-pose3D/outputs/omg_2137.MOV'
+	print('args.animation, ',args.animation)
+	generate_skeletons(video=video_path, output_animation=args.animation, num_person=args.num_person,  ab_dis=True)

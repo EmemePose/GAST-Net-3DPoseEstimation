@@ -1,13 +1,13 @@
 import matplotlib
 matplotlib.use('Agg')
-
+import sys
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, writers
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import subprocess as sp
 from tools.color_edge import h36m_color_edge
-
+import cv2
 
 def get_resolution(filename):
     command = ['ffprobe', '-v', 'error', '-select_streams', 'v:0',
@@ -27,27 +27,48 @@ def get_fps(filename):
             return int(a) / int(b)
 
 
-def read_video(filename, skip=0, limit=-1):
-    w, h = get_resolution(filename)
-
-    command = ['ffmpeg',
-               '-i', filename,
-               '-f', 'image2pipe',
-               '-pix_fmt', 'rgb24',
-               '-vsync', '0',
-               '-vcodec', 'rawvideo', '-']
+def read_video(filename, fps=None, skip=0, limit=-1):
+    stream = cv2.VideoCapture(filename)
 
     i = 0
-    with sp.Popen(command, stdout=sp.PIPE, bufsize=-1) as pipe:
-        while True:
-            data = pipe.stdout.read(w * h * 3)
-            if not data:
-                break
-            i += 1
-            if i > limit and limit != -1:
-                continue
-            if i > skip:
-                yield np.frombuffer(data, dtype='uint8').reshape((h, w, 3))
+    while True:
+        grabbed, frame = stream.read()
+        # if the `grabbed` boolean is `False`, then we have
+        # reached the end of the video file
+        if not grabbed:
+            print('===========================> This video get ' + str(i) + ' frames in total.')
+            sys.stdout.flush()
+            break
+
+        i += 1
+        if i > skip:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            yield np.array(frame)
+        if i == limit:
+            break
+
+# def read_video(filename, skip=0, limit=-1):
+#     w, h = get_resolution(filename)
+#     print('w: ', w)
+#     print('h: ', h)
+#     command = ['ffmpeg',
+#                '-i', filename,
+#                '-f', 'image2pipe',
+#                '-pix_fmt', 'rgb24',
+#                '-vsync', '0',
+#                '-vcodec', 'rawvideo', '-']
+
+#     i = 0
+#     with sp.Popen(command, stdout=sp.PIPE, bufsize=-1) as pipe:
+#         while True:
+#             data = pipe.stdout.read(w * h * 3)
+#             if not data:
+#                 break
+#             i += 1
+#             if i > limit and limit != -1:
+#                 continue
+#             if i > skip:
+#                 yield np.frombuffer(data, dtype='uint8').reshape((h, w, 3))
 
 
 def downsample_tensor(X, factor):
@@ -80,12 +101,12 @@ def render_animation(keypoints, keypoints_metadata, poses, skeleton, fps, bitrat
     ax_in.get_xaxis().set_visible(False)
     ax_in.get_yaxis().set_visible(False)
     ax_in.set_axis_off()
-    # ax_in.set_title('Input')
+    ax_in.set_title('Input')
 
     ax_3d = []
     lines_3d = []
     radius = 1.7
-
+    trajectories = []
     if num_person == 2 and com_reconstrcution:
         ax = fig.add_subplot(1, 2, 2, projection='3d')
         ax.view_init(elev=15., azim=azim)
@@ -108,7 +129,7 @@ def render_animation(keypoints, keypoints_metadata, poses, skeleton, fps, bitrat
             ax.set_xlim3d([-radius / 2, radius / 2])
             ax.set_zlim3d([0, radius])
             ax.set_ylim3d([-radius / 2, radius / 2])
-            ax.set_aspect('equal')
+            # ax.set_aspect('equal')
             ax.set_xticklabels([])
             ax.set_yticklabels([])
             ax.set_zticklabels([])
@@ -116,6 +137,7 @@ def render_animation(keypoints, keypoints_metadata, poses, skeleton, fps, bitrat
             # ax.set_title(title)  # , pad=35
             ax_3d.append(ax)
             lines_3d.append([])
+            trajectories.append(data[:, 0, [0, 1]]) #qjw added
         poses = list(poses.values())
 
     # Decode video
@@ -126,13 +148,14 @@ def render_animation(keypoints, keypoints_metadata, poses, skeleton, fps, bitrat
         # Load video using ffmpeg
         all_frames = []
         for f in read_video(input_video_path, skip=input_video_skip, limit=limit):
+            # cv2.imwrite('/home/jqin/wk/pose/pipeline/outputs/test.jpg', f)
             all_frames.append(f)
         effective_length = min(keypoints.shape[0], len(all_frames))
         all_frames = all_frames[:effective_length]
 
-        keypoints = keypoints[input_video_skip:]  # todo remove
-        for idx in range(len(poses)):
-            poses[idx] = poses[idx][input_video_skip:]
+        # keypoints = keypoints[input_video_skip:]  # todo remove
+        # for idx in range(len(poses)):
+        #     poses[idx] = poses[idx][input_video_skip:]
 
         if fps is None:
             fps = get_fps(input_video_path)

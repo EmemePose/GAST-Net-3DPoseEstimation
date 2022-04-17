@@ -1,0 +1,1 @@
+python gen_skes.py -v /home/jqin/wk/pose/video-to-pose3D/outputs/omg_2137.MOVz -np 1 --animation
